@@ -2,10 +2,28 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { getSkillStatus, installSkill, uninstallSkill, updateSkill } from "./skill.js";
+import {
+  createSkillContent,
+  getSkillStatus,
+  installSkill,
+  uninstallSkill,
+  updateSkill,
+} from "./skill.js";
 import { listTools } from "./tool-registry.js";
 
 describe("skill management", () => {
+  it("generates SKILL.md with YAML frontmatter on line 1", () => {
+    const content = createSkillContent();
+    // Frontmatter must be the very first thing in a skill file; the managed
+    // marker has to live after it or skill loaders cannot parse the metadata.
+    expect(content.startsWith("---\n")).toBe(true);
+    expect(content).toContain("name: readany");
+    expect(content).toContain("readany-cli-managed");
+    expect(content.indexOf("readany-cli-managed")).toBeGreaterThan(
+      content.indexOf("description:"),
+    );
+  });
+
   it("installs, reports, and uninstalls a managed skill", async () => {
     const root = await mkdtemp(join(tmpdir(), "readany-cli-skill-"));
     const skillFile = join(root, "skills", "readany", "SKILL.md");

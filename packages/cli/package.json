@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "bin": {
-    "readany": "./dist/bin/readany.js"
+    "readany": "./dist/bin/readany.js",
+    "readany-ask": "./dist/bin/readany-ask.js"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

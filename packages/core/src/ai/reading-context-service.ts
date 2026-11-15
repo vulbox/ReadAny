@@ -80,6 +80,18 @@ class ReadingContextService {
     return this.context;
   }
 
+  /**
+   * Seed the in-memory context from an already-persisted snapshot.
+   *
+   * Unlike updateContext(), this never schedules a snapshot write (the caller
+   * obtained the snapshot from disk, so rewriting it would be a no-op at best)
+   * and never touches listeners. Intended for non-UI hosts such as the CLI
+   * that need the in-memory service populated so AI context tools can read it.
+   */
+  hydrateFromSnapshot(snapshot: ReadingContext): void {
+    this.context = snapshot;
+  }
+
   async updateContext(partial: Partial<ReadingContext>): Promise<void> {
     if (!partial.bookId) {
       this.context = null;
@@ -214,4 +226,9 @@ export function useReadingContext(): ReadingContext | null {
 
 export function getReadingContextSnapshot(): ReadingContext | null {
   return readingContextService.getContext();
+}
+
+/** Seed the in-memory reading context from a persisted snapshot (no write-back). */
+export function hydrateReadingContextFromSnapshot(snapshot: ReadingContext): void {
+  readingContextService.hydrateFromSnapshot(snapshot);
 }

@@ -39,11 +39,11 @@ function renderMcpToolList(): string {
 }
 
 export function createSkillContent(version = CLI_VERSION): string {
-  return `${MANAGED_MARKER}
----
+  return `---
 name: readany
 description: Use ReadAny CLI and MCP to safely access the user's local ReadAny library, notes, knowledge base, RAG context, and EPUB draft workflows.
 ---
+${MANAGED_MARKER}
 
 # ReadAny
 
@@ -52,6 +52,7 @@ Use this skill when the user asks an external AI agent to search, read, organize
 ## Capabilities
 
 - Read book metadata, chapters, highlights, notes, bookmarks, and skills.
+- Ask the built-in reading agent about a book (\`readany-ask\`): book-grounded answers through the same shared chat execution used by the app, with citations and conversation threads.
 - Search ReadAny with metadata, keyword, semantic retrieval, and knowledge tools.
 - Read the current reader context snapshot when the desktop client provides one.
 - Inspect EPUB structure and use draft-first EPUB editing workflows when an editing profile is enabled.
@@ -65,7 +66,7 @@ Use this skill when the user asks an external AI agent to search, read, organize
 - Never request arbitrary shell, arbitrary SQL, or unrestricted filesystem access.
 - Do not overwrite original books; use ReadAny drafts and exports.
 - Treat publisher/export actions and draft discard as high-risk; ask the user to confirm in ReadAny.
-- Prefer MCP tools in clients that support MCP. Use CLI commands as a transparent fallback.
+- For book Q&A, follow the relay workflow below using the CLI. For other explicitly requested operations, prefer MCP tools when available.
 
 ## Client Setup Notes
 
@@ -77,6 +78,26 @@ Use this skill when the user asks an external AI agent to search, read, organize
 ## MCP Tools
 
 ${renderMcpToolList()}
+
+## Book Q&A (reading agent)
+
+For book analysis, explanation, and reading questions, act only as a relay between the user and ReadAny. The built-in reading agent owns retrieval, analysis, and the final answer.
+
+1. Keep the user's prompt unchanged. Do not expand it into a new task or add your own questions.
+2. If a book id is not known, use \`readany books search "<user-supplied title>" --json\` to match the title. Use the unique matching book. If several plausible books remain, display the candidates and stop; wait for the user to select one. If no book matches, report that result and stop.
+3. Make exactly ONE \`readany ask\` invocation per user question after matching. Start a named thread for the reading conversation and reuse it only when the user sends another question about the same book. Start a new thread when switching books.
+4. Display the returned final answer and citations directly, without rewriting, summarizing, extending, or adding your own analysis. If using JSON, display \`data.answer\`, \`data.citations\`, and \`data.artifacts\`. Preserve Mermaid code blocks and mindmap Markdown; render them when the client supports their format. Inline artifacts are results, not diagnostic tool logs.
+5. Do not autonomously follow up, retry, ask the user follow-up questions, or offer to continue. Do not call chapters, chapter, RAG, context, or other content tools to supplement the answer. Do not fetch pages in batches. Relay errors or incomplete answers as returned and stop until the user sends a new request.
+6. Do not enable \`--debug\` unless the user explicitly requests diagnostics. Each invocation uses one shared ReadAny chat execution; the CLI never automatically restarts it or rewrites the user prompt.
+
+\`\`\`bash
+readany books search "<book title>" --json
+readany ask "<unchanged user prompt>" --book <book-id> --thread <session>
+# ONLY after the user sends a new question in the same reading conversation:
+readany ask "<unchanged new user prompt>" --thread <session>
+\`\`\`
+
+\`readany-ask\` is an equivalent entrypoint. Default text output contains the final answer, inline mindmap content, and citations. The shared chat pipeline handles history windows and citation replay. CLI conversation files are separate from the app chat database; the CLI does not generate extra memory summaries. Errors, including output truncation, are relayed without automatic continuation. \`--json\` returns \`answer\`, \`citations\`, \`artifacts\` (mindmap title, markmap format, Markdown, and optional stats), \`bookId\`, \`contextTimestamp\`, \`rounds\`, \`toolCallCount\`, and optional \`threadId\` under \`data\`. Full \`toolCalls\` and diagnostic logs are opt-in with \`--debug\`. Editing and direct content access remain available only when explicitly requested by the user as a separate task.
 
 ## Commands
 
@@ -107,6 +128,8 @@ readany notes search <query> --json --book <book-id>
 readany highlights search <query> --json --book <book-id>
 readany knowledge search <query> --json --book <book-id>
 readany rag search <query> --book <book-id> --json
+readany-ask "<question>" --book <book-id> --thread <session> --json
+readany-ask "<follow-up>" --thread <session> --json
 readany epub inspect <book-id> --profile editor --json
 readany epub draft create <book-id> --profile editor --json
 readany epub chapter read <draft-id> <chapter-id> --format xhtml --profile editor --json

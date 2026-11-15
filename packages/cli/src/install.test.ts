@@ -60,6 +60,8 @@ describe("cli install", () => {
       path: join(userBinDir, "readany"),
       target: binPath,
       mode: "user",
+      askPath: join(userBinDir, "readany-ask"),
+      askTarget: join(root, "dist", "bin", "readany-ask.js"),
     });
 
     const stat = await lstat(installed.path);
@@ -75,6 +77,7 @@ describe("cli install", () => {
       removed: true,
       path: join(userBinDir, "readany"),
       mode: "user",
+      askRemoved: true,
     });
   });
 
@@ -104,7 +107,78 @@ describe("cli install", () => {
       removed: true,
       path: join(userBinDir, "readany.cmd"),
       mode: "user",
+      askRemoved: true,
     });
+  });
+
+  it("installs and removes the readany-ask Windows shim beside readany", async () => {
+    const root = await mkdtemp(join(tmpdir(), "readany-cli-win-ask-install-"));
+    const binPath = join(root, "dist", "bin", "readany.js");
+    const userBinDir = join(root, "bin");
+
+    const installed = await installCli({
+      binPath,
+      userBinDir,
+      platformName: "win32",
+    });
+
+    expect(installed.askPath).toBe(join(userBinDir, "readany-ask.cmd"));
+    expect(installed.askTarget).toBe(join(root, "dist", "bin", "readany-ask.js"));
+    const content = await readFile(installed.askPath, "utf8");
+    expect(content).toContain("readany-cli-managed");
+    expect(content).toContain(`node "${installed.askTarget}" %*`);
+
+    const uninstalled = await uninstallCli({
+      binPath,
+      userBinDir,
+      platformName: "win32",
+    });
+    expect(uninstalled.askRemoved).toBe(true);
+    await expect(lstat(installed.askPath)).rejects.toThrow();
+    await expect(lstat(installed.path)).rejects.toThrow();
+  });
+
+  it("does not overwrite an unmanaged readany-ask Windows shim", async () => {
+    const root = await mkdtemp(join(tmpdir(), "readany-cli-win-ask-unmanaged-"));
+    const binPath = join(root, "dist", "bin", "readany.js");
+    const userBinDir = join(root, "bin");
+    const unmanagedAsk = join(userBinDir, "readany-ask.cmd");
+    await mkdir(userBinDir, { recursive: true });
+    await writeFile(unmanagedAsk, "@echo off\r\necho user ask command\r\n", "utf8");
+
+    await expect(
+      installCli({
+        binPath,
+        userBinDir,
+        platformName: "win32",
+      }),
+    ).rejects.toThrow(/not managed by ReadAny CLI/);
+    // The primary shim must not be written when the ask shim is unmanaged.
+    await expect(lstat(join(userBinDir, "readany.cmd"))).rejects.toThrow();
+    expect(await readFile(unmanagedAsk, "utf8")).toContain("user ask command");
+  });
+
+  it("does not remove an unmanaged readany-ask Windows shim on uninstall", async () => {
+    const root = await mkdtemp(join(tmpdir(), "readany-cli-win-ask-unmanaged-uninstall-"));
+    const binPath = join(root, "dist", "bin", "readany.js");
+    const userBinDir = join(root, "bin");
+    const unmanagedAsk = join(userBinDir, "readany-ask.cmd");
+    await mkdir(userBinDir, { recursive: true });
+    await writeFile(
+      join(userBinDir, "readany.cmd"),
+      `@echo off\r\nREM readany-cli-managed\r\nnode "${binPath}" %*\r\n`,
+      "utf8",
+    );
+    await writeFile(unmanagedAsk, "@echo off\r\necho user ask command\r\n", "utf8");
+
+    await expect(
+      uninstallCli({
+        binPath,
+        userBinDir,
+        platformName: "win32",
+      }),
+    ).rejects.toThrow(/not managed by ReadAny CLI/);
+    expect(await readFile(unmanagedAsk, "utf8")).toContain("user ask command");
   });
 
   it("replaces a unix symlink to another ReadAny CLI build", async () => {

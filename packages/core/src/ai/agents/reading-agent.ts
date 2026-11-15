@@ -584,6 +584,12 @@ export interface ReadingAgentOptions {
   deepThinking?: boolean;
   spoilerFree?: boolean;
   memorySummary?: string;
+  /**
+   * Explicit response language for this turn. When omitted (desktop app),
+   * falls back to i18n.language exactly as before. Non-i18n hosts such as the
+   * CLI pass the language they resolved themselves.
+   */
+  userLanguage?: string;
   /** Injected tool provider — returns available tools for the agent */
   getAvailableTools: (options: {
     bookId: string | null;
@@ -816,6 +822,7 @@ export async function* streamReadingAgent(
     deepThinking,
     spoilerFree,
     memorySummary,
+    userLanguage,
     getAvailableTools,
     signal,
     toolTimeoutMs = DEFAULT_TOOL_TIMEOUT_MS,
@@ -894,7 +901,7 @@ export async function* streamReadingAgent(
       semanticContext,
       enabledSkills,
       isVectorized,
-      userLanguage: i18n.language || "en",
+      userLanguage: userLanguage?.trim() || i18n.language || "en",
       spoilerFree,
       memorySummary,
       questionCategory,

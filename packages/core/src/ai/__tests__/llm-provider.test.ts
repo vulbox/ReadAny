@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AIEndpoint } from "../../types";
-import { getEndpointFetch } from "../llm-provider";
+import { createChatModelFromEndpoint, getEndpointFetch } from "../llm-provider";
 
 const originalFetch = globalThis.fetch;
 
@@ -67,6 +67,28 @@ async function captureRequestBody(
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.unstubAllEnvs();
+});
+
+describe("Anthropic endpoint authentication", () => {
+  it("uses the endpoint key without inheriting a host agent's auth token", async () => {
+    vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "host-agent-gateway-token");
+    let headers = new Headers();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      return new Response(JSON.stringify({
+        id: "test-message", type: "message", role: "assistant", model: "test-model",
+        content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const model = await createChatModelFromEndpoint(makeEndpoint({
+      provider: "anthropic", baseUrl: "https://api.example.com", useExactRequestUrl: false,
+    }), "test-model", { streaming: false, maxTokens: 32 });
+    await model.invoke("Reply OK");
+    expect(headers.get("x-api-key")).toBe("test-key");
+    expect(headers.has("authorization")).toBe(false);
+  });
 });
 
 describe("getEndpointFetch Gemini thought signatures", () => {

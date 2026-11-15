@@ -6,14 +6,14 @@ import { fileURLToPath } from "node:url";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(scriptDir, "..");
 const outDir = resolve(rootDir, "dist");
-const outFile = resolve(outDir, "bin/readany.js");
+const outFiles = [resolve(outDir, "bin/readany.js"), resolve(outDir, "bin/readany-ask.js")];
 
 await rm(outDir, { recursive: true, force: true });
 
 await build({
-  entryPoints: [resolve(rootDir, "src/bin/readany.ts")],
+  entryPoints: [resolve(rootDir, "src/bin/readany.ts"), resolve(rootDir, "src/bin/readany-ask.ts")],
   outdir: outDir,
-  entryNames: "bin/readany",
+  entryNames: "bin/[name]",
   chunkNames: "chunks/[name]-[hash]",
   bundle: true,
   splitting: true,
@@ -28,7 +28,9 @@ await build({
 });
 
 await mkdir(resolve(rootDir, "dist/bin"), { recursive: true });
-await chmod(outFile, 0o755);
+for (const file of outFiles) {
+  await chmod(file, 0o755);
+}
 
 const pdfWorkerPath = fileURLToPath(import.meta.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs"));
 await mkdir(resolve(outDir, "chunks"), { recursive: true });

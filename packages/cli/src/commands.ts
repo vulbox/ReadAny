@@ -124,7 +124,7 @@ export function parseCommand(argv: string[]): ParsedCommand {
   };
 }
 
-class InvalidCommandOptionError extends Error {
+export class InvalidCommandOptionError extends Error {
   readonly code = "invalid_option";
 }
 
@@ -179,6 +179,8 @@ function getBooleanOption(command: ParsedCommand, name: string, fallback: boolea
   if (value === "false" || value === "0") return false;
   return fallback;
 }
+
+export { getBooleanOption, getNumberOption, getRequiredStringOption };
 
 function isNotesExportFormat(value: string): value is "markdown" | "json" | "obsidian" | "notion" {
   return value === "markdown" || value === "json" || value === "obsidian" || value === "notion";
@@ -355,6 +357,7 @@ Usage:
   readany knowledge search <query> [--json] [--book <book-id>] [--limit 20] [--content-limit 240]
   readany knowledge export --output <path> [--json] [--profile publisher] [--format markdown|json|obsidian] [--limit 1000] [--overwrite]
   readany rag search <query> --book <book-id> [--json] [--mode bm25|hybrid|vector] [--limit 5]
+  readany ask <prompt> [--book <book-id>] [--current] [--json] [--deep-thinking] [--spoiler-free] [--thread <id>] [--continue] [--debug] [--trace-file <new-file.jsonl>]
   readany mcp serve --profile readonly
   readany mcp config [--json] [--profile readonly|editor|publisher] [--client generic|claude|cursor|codex|opencode]
 `;
@@ -985,6 +988,11 @@ async function executeCommand(argv: string[], env = process.env): Promise<Comman
         });
       }
       return failure("unknown_context_command", `Unknown context command: ${subcommand}`);
+    }
+
+    if (command.name === "ask") {
+      const { askOptionsFromCommand, runAsk } = await import("./ask.js");
+      return runAsk(askOptionsFromCommand(command), env);
     }
 
     if (command.name === "epub") {

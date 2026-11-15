@@ -1,8 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { access, mkdir, readFile as fsReadFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import type {
   FetchOptions,
   FilePickerOptions,
@@ -12,6 +11,7 @@ import type {
   UpdateInfo,
   WebSocketOptions,
 } from "@readany/core/services";
+import { getReadAnyHome } from "../paths.js";
 
 type BetterSqliteDatabaseConstructor = typeof import("better-sqlite3");
 
@@ -21,10 +21,12 @@ function normalizeDir(path: string): string {
   return trimmed.replace(/[\\/]+$/, "");
 }
 
+// Same resolution as paths.ts getReadAnyHome: READANY_HOME wins, otherwise the
+// desktop app-data dir per OS (%APPDATA%\com.readany.app on Windows). The
+// desktop app persists readany-store/settings.json and desktop-data-root.json
+// here, so the CLI must look in the same place.
 function getDefaultDataRoot(env: NodeJS.ProcessEnv): string {
-  return env.READANY_HOME
-    ? resolve(env.READANY_HOME)
-    : join(homedir(), "Library", "Application Support", "com.readany.app");
+  return getReadAnyHome(env);
 }
 
 function getDesktopDataRootConfigPath(env: NodeJS.ProcessEnv): string {

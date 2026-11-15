@@ -614,6 +614,8 @@ export async function createChatModelFromEndpoint(
         maxTokens,
         streaming,
         clientOptions: {
+          // Endpoint credentials must not inherit a host agent's gateway token.
+          authToken: null,
           ...(endpoint.baseUrl ? { baseURL: endpoint.baseUrl } : {}),
           fetch: endpointFetch,
         },
